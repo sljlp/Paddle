@@ -433,10 +433,13 @@ GenerateOpFunctions(int split_count) {
 
   paddle::flat_hash_map<std::string, paddle::framework::OpInfo>
       op_info_map_need_gen;
+  std::ofstream opout("/tmp/op_list.txt", std::ios::app);
   for (auto& pair : op_info_map) {
+    opout << "op_to_gen name: " << pair.first << ", ";
     auto& op_info = pair.second;
     auto op_proto = op_info.proto_;
     if (op_proto == nullptr) {
+      opout << "op_proto is null\n";
       continue;
     }
     auto& op_type = op_proto->type();
@@ -445,16 +448,21 @@ GenerateOpFunctions(int split_count) {
     // if the phi lib contains op kernel, we still generate ops method
     if (!all_kernels.count(op_type) &&
         !phi::KernelFactory::Instance().HasCompatiblePhiKernel(op_type)) {
+      opout << "No kernel\n";
       continue;
     }
     // Skip the sparse op
     if (op_type.compare(0, 7, "sparse_") == 0 && op_type != "sparse_momentum" &&
         op_type != "sparse_attention") {
+      opout << "Sparse\n";
       continue;
     }
 
+    opout << "emplace\n";
+
     op_info_map_need_gen.emplace(pair);
   }
+  opout.close();
 
   int cc_file_api_size = op_info_map_need_gen.size() / split_count;
   if (op_info_map_need_gen.size() % split_count != 0) {
