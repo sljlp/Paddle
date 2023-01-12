@@ -25,6 +25,7 @@
 import numpy as np
 
 import paddle
+import paddle.distributed as dist
 from paddle.fluid import core
 
 from .group_sharded_utils import Type, cvt_to_device, device_guard
@@ -329,3 +330,47 @@ class GradStorage(InternalStorage):
             del tmp_var
 
         self._fill = offset
+
+    def _get_grad(self, param, align, offset):
+        '''
+        for debugging
+        get grad buffer of param, and return the buffer and nextoffset
+        '''
+        assert (
+            param._numel() > 0
+        ), "Cannot add a gradient to a released InternalStorage, please rebuild"
+        assert param.dtype == self.buffer.dtype
+        fill = offset
+
+        grad_end = fill + param._numel()
+        offset = grad_end + align
+        assert offset <= self.buffer._numel()
+
+        # Copy the current grad value to InternalStorage
+        with device_guard(self.dev_id, self._device):
+            tmp_var = self.buffer._slice(fill, grad_end)
+        return tmp_var, offset
+
+    def _check_same(self, tag="err"):
+        '''
+        for debugging
+        check if the gradients of self._params has the same data with self.grad_storage
+        '''
+        offset = 0
+        try:
+            for p in self._params:
+                tmp_var, offset = self._get_grad(
+                    p, self._parm2align[p.name], offset
+                )
+                tmp_var.get_tensor()._set_dims(p.shape)
+                assert np.allclose(
+                    tmp_var, p.grad
+                ), f"Error diff: {p.name}: {p}\nvs\n{tmp_var}"
+                print(
+                    "checked same",
+                    file=open(f"/tmp/{tag}.err.log.{dist.get_rank()}", "a"),
+                )
+                del tmp_var
+        except Exception as e:
+            print(e, file=open(f"/tmp/{tag}.err.log.{dist.get_rank()}", "a"))
+            raise e

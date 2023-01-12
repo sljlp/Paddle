@@ -583,7 +583,14 @@ class GroupShardedStage2(nn.Layer):
         # Rebuild fp16/fp32 grad storages
         for dtype in self._grad_storages.keys():
             for dst_rank, grad_storage in self._grad_storages[dtype].items():
-                if self._offload or dst_rank != self._rank:
+                # On xpu, all the grad storages should be rebuilt.
+                # The params and storage buffer will poit different addr if not rebuilt after a step.
+                # The base cause is noty found now, but the speed is hardly slowed down.
+                if (
+                    self._offload
+                    or dst_rank != self._rank
+                    or paddle.is_compiled_with_xpu()
+                ):
                     grad_storage.manumal_relase()
                     grad_storage.rebuild()
 
