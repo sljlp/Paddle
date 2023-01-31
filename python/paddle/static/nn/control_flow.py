@@ -506,7 +506,7 @@ def while_loop(cond, body, loop_vars, is_test=False, name=None):
         now_cond = cond(*output_vars)
         map_structure(assign_skip_lod_tensor_array, output_vars, loop_vars)
         paddle.assign(now_cond, pre_cond)
-    return loop_vars
+    return loop_vars + [pre_cond]
 
 
 def _deal_with_undefined_var(output_vars, loop_vars):

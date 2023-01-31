@@ -242,4 +242,5 @@ REGISTER_OP_CUDA_KERNEL(recv_v2,
                         ops::RecvOpV2CUDAKernel<int>,
                         ops::RecvOpV2CUDAKernel<int64_t>,
                         ops::RecvOpV2CUDAKernel<int8_t>,
-                        ops::RecvOpV2CUDAKernel<plat::float16>);
+                        ops::RecvOpV2CUDAKernel<plat::float16>,
+                        ops::RecvOpV2CUDAKernel<bool>);

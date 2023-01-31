@@ -227,4 +227,5 @@ REGISTER_OP_CUDA_KERNEL(send_v2,
                         ops::SendOpV2CUDAKernel<int>,
                         ops::SendOpV2CUDAKernel<int64_t>,
                         ops::SendOpV2CUDAKernel<int8_t>,
-                        ops::SendOpV2CUDAKernel<plat::float16>);
+                        ops::SendOpV2CUDAKernel<plat::float16>,
+                        ops::SendOpV2CUDAKernel<bool>);
