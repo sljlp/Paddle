@@ -20,7 +20,6 @@ import multiprocessing
 import sys
 import warnings
 import numpy as np
-from pytest import Instance
 from .wrapped_decorator import signature_safe_contextmanager
 import six
 from .data_feeder import convert_dtype
