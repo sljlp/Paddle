@@ -20,6 +20,7 @@ import multiprocessing
 import sys
 import warnings
 import numpy as np
+from pytest import Instance
 from .wrapped_decorator import signature_safe_contextmanager
 import six
 from .data_feeder import convert_dtype
@@ -1627,6 +1628,7 @@ class Executor(object):
                     feed=feed,
                     fetch_list=fetch_list,
                     with_standalone_executor=self._fleet_executor_with_standalone,
+                    return_numpy=return_numpy,
                 )
             if "startup_program" in program._pipeline_opt:
                 program = program._pipeline_opt["startup_program"]
@@ -2574,6 +2576,7 @@ class Executor(object):
         fetch_var_name="fetch",
         fetch_list=None,
         with_standalone_executor=False,
+        return_numpy=True,
     ):
         cache_key = _get_strong_program_cache_key(program, feed, fetch_list)
         cached_program = self._get_program_cache(cache_key)
@@ -2690,17 +2693,26 @@ class Executor(object):
             # fetch each.
             result_list = []
             for scope in micro_scope_list:
-                tensor = None
-                for var in fleet_opt["fetch_var"]:
-                    assert isinstance(var, str)
-                    print(
-                        "!!!!!!!!!: varname {}, {}" % (var, scope.find_var(var))
-                    )
-                    arr = scope.find_var(var).get_tensor()
-                    tensor = arr._move_to_list()
-                    # tensor = core.get_variable_tensor(scope, var)
-                if tensor:
-                    result_list.append(as_numpy(tensor))
+                scope_result_list = []
+                for varname in fleet_opt["fetch_var"]:
+                    tensor = None
+                    try:
+                        tensor = core.get_variable_tensor(scope, varname)
+                        if return_numpy:
+                            tensor = as_numpy(tensor)
+                    except:
+                        var = scope.find_var(varname)
+                        tensor = var.get_lod_tensor_array()
+                        if return_numpy:
+                            tensor = as_numpy(tensor)
+                        else:
+                            tensor = [t for t in tensor]
+
+                    if tensor:
+                        scope_result_list.append(tensor)
+
+                if scope_result_list:
+                    result_list.append(scope_result_list)
             return result_list
 
         if fetch_list:
