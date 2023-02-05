@@ -109,7 +109,7 @@ void CondInterceptor::Compute() {
       SendDataReady(down_id);
     }
   } else {
-    VLOG(3) << "Finish loop in scope " << cur_scope_id_;
+    VLOG(0) << "Finish loop in scope " << cur_scope_id_;
     SendDataReady(stop_loop_id_);
   }
 }

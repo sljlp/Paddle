@@ -211,7 +211,7 @@ void ComputeInterceptor::Run() {
     // cur_scope_id_ = ready_queue_.front();
     // ready_queue_.pop();
 
-    VLOG(3) << "id=" << GetInterceptorId()
+    VLOG(0) << "id=" << GetInterceptorId()
             << " ComputeInterceptor running in scope " << cur_scope_id_;
 
     RunOps();

@@ -32,6 +32,7 @@ class ComputeInterceptor : public Interceptor {
   virtual void RunOps();
   virtual void SendDataReadyToDownStream();
   virtual void ReplyCompletedToUpStream();
+  virtual void Compute(const InterceptorMessage& msg);
   void Run();
   void IncreaseReady(int64_t up_id, int64_t scope_id);
   void DecreaseBuff(int64_t down_id);
@@ -49,8 +50,6 @@ class ComputeInterceptor : public Interceptor {
 
   bool IsInputReady();
   bool CanWriteOutput();
-
-  void Compute(const InterceptorMessage& msg);
 };
 
 }  // namespace distributed

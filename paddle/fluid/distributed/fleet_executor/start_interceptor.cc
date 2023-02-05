@@ -91,18 +91,18 @@ void StartInterceptor::Compute(const InterceptorMessage& msg) {
     IncreaseReady(msg.src_id(), msg.scope_idx());
     Run();
   } else if (msg.message_type() == DATA_IS_USELESS) {
-    DecreaseBuff(msg.src_id());
+    VLOG(3) << "Start interceptor receive data_is_useless " << msg.src_id()
+            << " " << finish_count_;
     finish_count_--;
     if (finish_count_ == 0) {
       for (int64_t i = 0; i < batch_size_; ++i) {
-        for (auto& ins : in_readys_) {
-          auto up_id = ins.first;
-          InterceptorMessage reply_msg;
-          reply_msg.set_message_type(DATA_IS_USELESS);
-          VLOG(3) << "StartInterceptor " << interceptor_id_
-                  << " Send data_is_useless msg to " << up_id;
-          Send(up_id, reply_msg);
+        for (auto& outs : out_buffs_) {
+          auto down_id = outs.first;
+          DecreaseBuff(down_id);
         }
+      }
+      for (int64_t i = 0; i < batch_size_; ++i) {
+        Run();
       }
     }
   }

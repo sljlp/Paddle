@@ -28,7 +28,7 @@ class StartInterceptor final : public ComputeInterceptor {
  private:
   void SendDataReadyToDownStream() override;
   void RunOps() override;
-  void Compute(const InterceptorMessage& msg);
+  void Compute(const InterceptorMessage& msg) override;
 
   int64_t batch_size_{0};
   int64_t finish_count_{0};
