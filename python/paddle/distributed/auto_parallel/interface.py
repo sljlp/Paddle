@@ -81,10 +81,8 @@ def shard_tensor(x, process_mesh=None, shard_spec=None):
         shard_spec, list
     ), "Argument shard_spec {} is not an instance of list".format(shard_spec)
     if isinstance(x, str):
-        x_var = (
-            paddle.fluid.default_main_program().global_block()._var_recursive(x)
-        )
-        dist_tensor = DistributedTensor(x_var)
+        x = paddle.fluid.default_main_program().global_block()._var_recursive(x)
+        dist_tensor = DistributedTensor(x)
     else:
         dist_tensor = DistributedTensor(x)
     serial_tensor = dist_tensor.serial_tensor
