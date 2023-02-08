@@ -72,10 +72,10 @@ void StartInterceptor::SendDataReadyToDownStream() {
         auto down_id = outs.first;
         InterceptorMessage ready_msg;
         ready_msg.set_message_type(DATA_IS_READY);
-        ready_msg.set_scope_idx(step_);
+        ready_msg.set_scope_idx(step_ % node_->max_run_times());
         VLOG(3) << "StartInterceptor " << interceptor_id_
                 << " Send data_is_ready msg to " << down_id
-                << " in scope: " << step_;
+                << " in scope: " << step_ % node_->max_run_times();
         Send(down_id, ready_msg);
       }
       step_++;

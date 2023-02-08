@@ -66,21 +66,21 @@ class PipelinePass(PassBase):
         self._mode = self.get_attr("schedule_mode")
         self._program = main_program
 
-        self._insert_sync_op()
-
         if self._mode == "1F1B":
+            self._insert_sync_ops_for_1f1b()
             self._task_1f1b()
         elif self._mode == "F-Then-B":
             raise NotImplementedError("F-Then-B has not been implemented")
         elif self._mode == "stream":
+            self._insert_sync_ops_for_stream()
             self._task_stream()
         else:
             raise ValueError(
-                "Now only 'F-then-B' and '1F1B' are supported."
+                "Now only 'F-then-B', '1F1B' and 'stream' are supported."
                 "The given value is {}.".format(self._mode)
             )
 
-    def _insert_sync_op(self):
+    def _insert_sync_ops_for_1f1b(self):
         """
         This implementation refers to lots of Paddle/python/paddle/fluid/optimizer.py.
         The difference between this function with 'PipelineOptimizer' is that
@@ -115,26 +115,27 @@ class PipelinePass(PassBase):
                     offset += 1
                     # step3: insert 'c_sync_comm_stream' op after 'send_v2' op or
                     # before the first optimize op
-                    # if int(op_role) == int(OpRole.Backward):
-                    #     index = first_optimize_index + offset
-                    #     new_op_role = OpRole.Optimize
-                    # else:
-                    #     index = index + offset + 1
-                    #     new_op_role = OpRole.Backward
-                    # sync_comm_op = block._insert_op_without_sync(
-                    #     index=index,
-                    #     type="c_sync_comm_stream",
-                    #     inputs={'X': [var]},
-                    #     outputs={'Out': [var]},
-                    #     attrs={
-                    #         'op_role': new_op_role,
-                    #         'ring_id': ring_id,
-                    #     })
+                    if int(op_role) == int(OpRole.Backward):
+                        index = first_optimize_index + offset
+                        new_op_role = OpRole.Optimize
+                    else:
+                        index = index + offset + 1
+                        new_op_role = OpRole.Backward
+                    sync_comm_op = block._insert_op_without_sync(
+                        index=index,
+                        type="c_sync_comm_stream",
+                        inputs={'X': [var]},
+                        outputs={'Out': [var]},
+                        attrs={
+                            'op_role': new_op_role,
+                            'ring_id': ring_id,
+                        },
+                    )
                     # step4: If 'send_v2' op in forward parse, set 'pipeline_flag' to distinguish
                     # whether the 'c_sync_comm_stream' op is inserted for pipeline.
-                    # if int(op_role) == int(OpRole.Forward):
-                    #     sync_comm_op._set_attr('pipeline_flag', '')
-                    #     offset += 1
+                    if int(op_role) == int(OpRole.Forward):
+                        sync_comm_op._set_attr('pipeline_flag', '')
+                        offset += 1
             block._sync_with_cpp()
 
             offset = 0
@@ -164,6 +165,37 @@ class PipelinePass(PassBase):
                         outputs={'Out': [var]},
                         attrs={'op_role': OpRole.Backward},
                     )
+            block._sync_with_cpp()
+
+    def _insert_sync_ops_for_stream(self):
+
+        for block in self._program.blocks:
+            offset = 0
+            send_vars = []
+            # insert sync ops
+            for index, op in enumerate(list(block.ops)):
+                if op.type == 'send_v2':
+                    # step1: set 'use_calc_stream' False
+                    op._set_attr("use_calc_stream", False)
+                    op_role = op.attr('op_role')
+                    # step2: insert 'c_sync_calc_stream' op before 'send_v2' op
+                    var_name = op.input_arg_names[0]
+                    var = block.var(var_name)
+                    block._insert_op_without_sync(
+                        index=index + offset,
+                        type="c_sync_calc_stream",
+                        inputs={'X': [var]},
+                        outputs={'Out': [var]},
+                        attrs={'op_role': op_role},
+                    )
+                    offset += 1
+                    send_vars.append(var_name)
+
+            for var_name in send_vars:
+                nop_op = block.append_op(type='nop')
+                nop_op.desc.set_input('X', [var_name])
+                nop_op.desc.set_output('Out', [var_name])
+
             block._sync_with_cpp()
 
     def _create_param(self, dst_block, src_var):
@@ -467,6 +499,14 @@ class PipelinePass(PassBase):
             "num_micro_batches": self._acc_steps,
         }
 
+    def _get_pp_stage(self, rank):
+        pp_idx = None
+        for idx, process_mesh in enumerate(self._dist_context.process_meshes):
+            if rank in process_mesh.processes:
+                pp_idx = idx
+                break
+        return pp_idx
+
     def _task_stream(self):
         cur_rank = int(os.getenv("PADDLE_TRAINER_ID", 0))
         trainer_endpoints = os.getenv("PADDLE_TRAINER_ENDPOINTS", "").split(',')
@@ -475,12 +515,11 @@ class PipelinePass(PassBase):
 
         # compute current pp stage
         pp_stages = len(self._dist_context.process_meshes)
-        for idx, process_mesh in enumerate(self._dist_context.process_meshes):
-            if cur_rank in process_mesh.processes:
-                pp_idx = idx
-                break
+        cur_pp_stage = self._get_pp_stage(cur_rank)
+
+        print("pp_stages:", pp_stages)
         print("cur_rank:", cur_rank)
-        print("pp stage:", pp_idx)
+        print("cur_pp_stage:", cur_pp_stage)
         print("process_meshes:", self._dist_context.process_meshes)
         for process_mesh in self._dist_context.process_meshes:
             print("--> processes:", process_mesh.processes)
@@ -558,77 +597,22 @@ class PipelinePass(PassBase):
         print("=" * 20)
         print("start_prog:")
         print(start_prog)
-        for var in start_prog.list_vars():
-            if (
-                "create_py_reader_" in var.name
-                or "double_buffer_" in var.name
-                or "generated_var_" in var.name
-            ):
-                continue
-            if "beam_search" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
-            if "array" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
 
         print("=" * 20)
         print("cond_prog:")
         print(cond_prog)
-        for var in cond_prog.list_vars():
-            if (
-                "create_py_reader_" in var.name
-                or "double_buffer_" in var.name
-                or "generated_var_" in var.name
-            ):
-                continue
-            if "beam_search" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
-            if "array" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
 
         print("=" * 20)
         print("send_prog:")
         print(send_prog)
-        for var in send_prog.list_vars():
-            if (
-                "create_py_reader_" in var.name
-                or "double_buffer_" in var.name
-                or "generated_var_" in var.name
-            ):
-                continue
-            if "beam_search" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
-            if "array" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
 
         print("=" * 20)
         print("recv_prog:")
         print(recv_prog)
-        for var in recv_prog.list_vars():
-            if (
-                "create_py_reader_" in var.name
-                or "double_buffer_" in var.name
-                or "generated_var_" in var.name
-            ):
-                continue
-            if "beam_search" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
-            if "array" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
 
         print("=" * 20)
         print("end_prog:")
         print(end_prog)
-        for var in end_prog.list_vars():
-            if (
-                "create_py_reader_" in var.name
-                or "double_buffer_" in var.name
-                or "generated_var_" in var.name
-            ):
-                continue
-            if "beam_search" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
-            if "array" in var.name:
-                print(var.name, "'s lod level:", var.lod_level)
 
         assert cond_var_name is not None
 
@@ -676,7 +660,7 @@ class PipelinePass(PassBase):
 
         # add dependencies for task nodes intra stage
         inf = 2**31 - 1
-        pp_buff_size = int(pp_stages - pp_idx)
+        pp_buff_size = int(pp_stages - cur_pp_stage)
         start_task_node.add_downstream_task(cond_task_node.task_id(), pp_stages)
         print(
             "Task ",
@@ -684,7 +668,7 @@ class PipelinePass(PassBase):
             "'s downstream is:",
             cond_task_node.task_id(),
             ", buffer size is:",
-            self._acc_steps,
+            pp_stages,
         )
         cond_task_node.add_upstream_task(start_task_node.task_id(), pp_stages)
         print(
@@ -693,7 +677,7 @@ class PipelinePass(PassBase):
             "'s upstream is:",
             start_task_node.task_id(),
             ", buffer size is:",
-            self._acc_steps,
+            pp_stages,
         )
         cond_task_node.add_downstream_task(send_task_node.task_id(), inf)
         print(
@@ -785,7 +769,8 @@ class PipelinePass(PassBase):
         pp_downstream_ranks = up_down_streams.downs(cur_rank)
 
         for upstream_rank in pp_upstream_ranks:
-            if upstream_rank < pp_stages - 1:
+            upstream_pp_stage = self._get_pp_stage(upstream_rank)
+            if upstream_pp_stage < pp_stages - 1:
                 upstream_task_id = int(upstream_rank * num_of_functionality + 2)
                 send_task_node.add_upstream_task(upstream_task_id)
                 print(
@@ -808,7 +793,7 @@ class PipelinePass(PassBase):
                     2,
                 )
         for downstream_rank in pp_downstream_ranks:
-            if pp_idx < pp_stages - 1:
+            if cur_pp_stage < pp_stages - 1:
                 downstream_task_id = int(
                     downstream_rank * num_of_functionality + 2
                 )

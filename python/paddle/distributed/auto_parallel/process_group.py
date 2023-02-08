@@ -46,7 +46,7 @@ def get_world_process_group():
 def clear_all_process_groups():
     global _g_process_group_map
     _g_process_group_map = {}
-    _g_process_group_map[0] = ProcessGroup(0, [])
+    _g_process_group_map[0] = ProcessGroup(1000, [])
 
 
 def new_process_group(ranks, group_id=None):
@@ -58,11 +58,11 @@ def new_process_group(ranks, group_id=None):
         if pg_id != 0 and new_key == cur_key:
             return pg
     # If not matching the existing one, construt a new process group
-    num_groups = len(_g_process_group_map) + 20
+    num_groups = len(_g_process_group_map)
     # Note: our process group may interfere with the original implementation
     # so the created group id should start from the original _new_ring_id()
     if group_id is None:
-        group_id = _new_ring_id() + num_groups + 1
+        group_id = _new_ring_id() + num_groups + 1000
 
     new_pg = ProcessGroup(group_id, ranks)
     _g_process_group_map[group_id] = new_pg
@@ -77,14 +77,14 @@ def new_process_group(ranks, group_id=None):
 # handle the communication implementation choice.
 class ProcessGroup:
     def __init__(self, group_id, ranks):
-        if group_id == 0 and get_process_group(0) is not None:
+        if group_id == 1000 and get_process_group(0) is not None:
             assert (
-                group_id != 0
-            ), "Process group id 0 is reserved for all ranks."
+                group_id != 1000
+            ), "Process group id 1000 is reserved for all ranks."
         self._group_id = group_id
         self._ranks = ranks
         # Add the current ranks into group 0
-        if group_id != 0:
+        if group_id != 1000:
             global _g_process_group_map
             _g_process_group_map[0].add_ranks(ranks)
         self._is_instantiate = False
@@ -191,4 +191,4 @@ class ProcessGroup:
 # Note that Process group 0 is reserved for representing all ranks.
 # At the beginning, group 0 is empty and new ranks will be added automatically.
 _g_process_group_map = OrderedDict()
-_g_process_group_map[0] = ProcessGroup(0, [])
+_g_process_group_map[0] = ProcessGroup(1000, [])
