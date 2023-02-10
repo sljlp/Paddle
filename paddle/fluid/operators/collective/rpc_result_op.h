@@ -54,10 +54,10 @@ class RpcResultOpKernel : public framework::OpKernel<T> {
     bool ok = event->wait() == 0 && rpc_store.GetErrorCode(request_id) == 0;
     if (ok) {
       const std::string& resp = rpc_store.GetResponse(request_id);
-      VLOG(3) << "Request id " << request_id << " raw response: " << resp;
-
-      auto* out = ctx.Output<phi::DenseTensor>("Out");
       const std::string res_dtype = ctx.Attr<std::string>("res_dtype");
+      VLOG(3) << "Request id " << request_id << " raw response: " << resp
+              << " res type: " << res_dtype;
+      auto* out = ctx.Output<phi::DenseTensor>("Out");
       if (res_dtype == "float") {
         auto res = ParseFloatResponse(resp);
         ctx.device_context().Alloc<double>(out);
