@@ -52,19 +52,26 @@ class RpcResultOpKernel : public framework::OpKernel<T> {
     auto event = rpc_store.GetEvent(request_id);
 
     bool ok = event->wait() == 0 && rpc_store.GetErrorCode(request_id) == 0;
+    auto* out = ctx.Output<phi::DenseTensor>("Out");
+    if (res_dtype == "float") {
+      ctx.device_context().Alloc<double>(out);
+    } else if (res_dtype == "str") {
+      ctx.device_context().Alloc<uint8_t>(out);
+    } else {
+      PADDLE_THROW(platform::errors::InvalidArgument(
+          "Unknown result dtype. The suppoted type is str and float"));
+    }
+
     if (ok) {
       const std::string& resp = rpc_store.GetResponse(request_id);
       const std::string res_dtype = ctx.Attr<std::string>("res_dtype");
       VLOG(3) << "Request id " << request_id << " raw response: " << resp
               << " res type: " << res_dtype;
-      auto* out = ctx.Output<phi::DenseTensor>("Out");
       if (res_dtype == "float") {
         auto res = ParseFloatResponse(resp);
-        ctx.device_context().Alloc<double>(out);
         framework::TensorFromVector(res, ctx.device_context(), out);
       } else if (res_dtype == "str") {
         auto res = ParseStrResponse(resp);
-        ctx.device_context().Alloc<uint8_t>(out);
         framework::TensorFromVector(res, ctx.device_context(), out);
       } else {
         PADDLE_THROW(
@@ -77,6 +84,5 @@ class RpcResultOpKernel : public framework::OpKernel<T> {
     framework::TensorFromVector(succeed_wrapper, ctx.device_context(), succeed);
   }
 };
-
 }  // namespace operators
 }  // namespace paddle
