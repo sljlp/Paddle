@@ -20,6 +20,8 @@ limitations under the License. */
 #include "paddle/phi/kernels/funcs/blas/blas.h"
 #include "paddle/phi/kernels/funcs/eigen/common.h"
 #include "paddle/phi/kernels/funcs/math_function.h"
+#include "paddle/phi/core/selected_rows.h"
+
 
 #define INLINE_FOR2(sizei, sizej)     \
   for (int64_t i = 0; i < sizei; i++) \

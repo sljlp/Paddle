@@ -24,6 +24,8 @@ limitations under the License. */
 #include "paddle/phi/backends/onednn/axpy_handler.h"
 #endif
 
+#include <set>
+
 namespace phi {
 namespace funcs {
 template <typename T>

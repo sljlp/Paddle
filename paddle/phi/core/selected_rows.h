@@ -20,8 +20,10 @@ limitations under the License. */
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
 #include "paddle/phi/core/selected_rows_impl.h"
+#include "paddle/phi/common/data_type.h"
+#include "paddle/phi/core/mixed_vector.h"
+#include "paddle/fluid/framework/data_type.h"
 
 namespace phi {
 class SelectedRows : public TensorBase,

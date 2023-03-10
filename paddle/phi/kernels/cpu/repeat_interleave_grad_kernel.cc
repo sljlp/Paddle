@@ -19,6 +19,7 @@
 #include "paddle/phi/core/utils/data_type.h"
 #include "paddle/phi/kernels/cpu/index_select_impl.h"
 #include "paddle/phi/kernels/funcs/repeat_tensor2index_tensor.h"
+#include "paddle/phi/backends/context_pool.h"
 
 namespace phi {
 
