@@ -113,14 +113,16 @@ platform::DeviceContext* DeviceContextPool::Get(const platform::Place& place) {
 
   auto it = ptr->find(place);
   if (it == ptr->end()) {
-    PADDLE_THROW(platform::errors::Unimplemented(
-        "Place %s is not supported. Please check that your paddle compiles "
-        "with WITH_GPU, WITH_XPU, WITH_IPU, WITH_MLU or WITH_ASCEND_CL option "
-        "or check "
-        "that your train process set the correct device id if you use "
-        "Executor.",
-        place));
+    static int selected_xpu = std::stoi(std::getenv("FLAGS_selected_xpus"));
+    it = ptr->find(platform::XPUPlace(selected_xpu));
   }
+  // if (it == ptr->end()) {
+  //   PADDLE_THROW(platform::errors::Unimplemented(
+  //       "Place %s is not supported. Please check that your paddle compiles "
+  //       "with WITH_GPU, WITH_XPU, WITH_IPU, WITH_MLU or WITH_ASCEND_CL option
+  //       " "or check " "that your train process set the correct device id if
+  //       you use " "Executor.", place));
+  // }
   return it->second.get().get();
 }
 
