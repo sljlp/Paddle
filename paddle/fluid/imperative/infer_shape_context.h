@@ -379,11 +379,17 @@ class DygraphInferShapeContext : public framework::InferShapeContext {
 
   void SetOutputDim(const std::string& name, const DDim& dim) override {
     auto it = var_map_out_->find(name);
-    PADDLE_ENFORCE_NE(
-        it,
-        var_map_out_->end(),
-        platform::errors::NotFound("can not find [%s] in output", name));
-
+    // VLOG(0) << "map size: " << var_map_out_->size();
+    // for (auto it = var_map_out_->begin(); it!= var_map_out_->end(); ++it) {
+    //   VLOG(0) << "var name:" <<  it->first;
+    // }
+    // PADDLE_ENFORCE_NE(
+    //     it,
+    //     var_map_out_->end(),
+    //     platform::errors::NotFound("can not find [%s] in output", name));
+    if (it == var_map_out_->end()) {
+      return;
+    }
     if (it->second[0]) {
       SetDim(it->second[0]->MutableVar(), dim);
     }

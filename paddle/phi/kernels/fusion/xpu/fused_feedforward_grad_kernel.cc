@@ -21,6 +21,10 @@ limitations under the License. */
 #include "paddle/phi/kernels/impl/matmul_grad_kernel_impl.h"
 #include "paddle/phi/kernels/xpu/xpu_api_wrapper.h"
 #include "paddle/phi/kernels/xpu/xpu_fused_common_function.h"
+#include "glog/logging.h"
+
+
+#define is_null(name) //{ VLOG(0) << #name << " is null: " << ((name) == nullptr);}
 
 namespace phi {
 namespace fusion {
@@ -83,16 +87,28 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
   const float* ln_variance_ptr = ln_variance->data<float>();
   // outputs ptr
   XPUTypeT* d_x_ptr = reinterpret_cast<XPUTypeT*>(d_x->data<T>());
-  XPUTypeT* d_linear1_weight_ptr =
-      reinterpret_cast<XPUTypeT*>(d_linear1_weight->data<T>());
-  XPUTypeT* d_linear1_bias_ptr =
-      reinterpret_cast<XPUTypeT*>(d_linear1_bias->data<T>());
-  XPUTypeT* d_linear2_weight_ptr =
-      reinterpret_cast<XPUTypeT*>(d_linear2_weight->data<T>());
-  XPUTypeT* d_linear2_bias_ptr =
-      reinterpret_cast<XPUTypeT*>(d_linear2_bias->data<T>());
-  float* d_ln_scale_ptr = d_ln_scale->data<float>();
-  float* d_ln_bias_ptr = d_ln_bias->data<float>();
+  // XPUTypeT* d_linear1_weight_ptr =
+  //     reinterpret_cast<XPUTypeT*>(d_linear1_weight->data<T>());
+  // XPUTypeT* d_linear1_bias_ptr =
+  //     reinterpret_cast<XPUTypeT*>(d_linear1_bias->data<T>());
+  // XPUTypeT* d_linear2_weight_ptr =
+  //     reinterpret_cast<XPUTypeT*>(d_linear2_weight->data<T>());
+  // XPUTypeT* d_linear2_bias_ptr =
+  //     reinterpret_cast<XPUTypeT*>(d_linear2_bias->data<T>());
+  // float* d_ln_scale_ptr = d_ln_scale->data<float>();
+  // float* d_ln_bias_ptr = d_ln_bias->data<float>();
+
+
+    // XPUTypeT* d_linear1_weight_ptr = nullptr;
+      // reinterpret_cast<XPUTypeT*>(d_linear1_weight->data<T>());
+  // XPUTypeT* d_linear1_bias_ptr = nullptr;
+      // reinterpret_cast<XPUTypeT*>(d_linear1_bias->data<T>());
+  // XPUTypeT* d_linear2_weight_ptr = nullptr;
+      // reinterpret_cast<XPUTypeT*>(d_linear2_weight->data<T>());
+  // XPUTypeT* d_linear2_bias_ptr = nullptr;
+      // reinterpret_cast<XPUTypeT*>(d_linear2_bias->data<T>());
+  float* d_ln_scale_ptr = nullptr; //d_ln_scale->data<float>();
+  float* d_ln_bias_ptr = nullptr; //d_ln_bias->data<float>();
 
   size_t l3_total_size = xpu_ctx->_l3_mgr.get_size();
 
@@ -190,9 +206,9 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
                    dropout_param2,
                    bsz_seq * d_model);
   // linear_grad2
-  r = xpu::reduce_sum(
-      xpu_ctx, d_dropout2_out_ptr, d_linear2_bias_ptr, {bsz_seq, d_model}, {0});
-  PADDLE_ENFORCE_XDNN_SUCCESS(r, "reduce_sum");
+  // r = xpu::reduce_sum(
+  //     xpu_ctx, d_dropout2_out_ptr, d_linear2_bias_ptr, {bsz_seq, d_model}, {0});
+  // PADDLE_ENFORCE_XDNN_SUCCESS(r, "reduce_sum");
 
   phi::XpuFcInfo linear2_fc_info;
   linear2_fc_info.InitFcInfo(0,
@@ -210,9 +226,11 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
   const XPUTypeT* a_2 = reinterpret_cast<const XPUTypeT*>(NULL);
   const XPUTypeT* b_2 = reinterpret_cast<const XPUTypeT*>(NULL);
   XPUTypeT* c_1 = d_linear2_out_ptr;
-  XPUTypeT* c_2 = d_linear2_weight_ptr;
+  // XPUTypeT* c_2 = d_linear2_weight_ptr;
   phi::XpuFcInfo info_d_dropout1;
   phi::XpuFcInfo info_dw2;
+
+  // VLOG(0) << "matmul";
 
   std::tuple<phi::XpuFcInfo,
              phi::XpuFcInfo,
@@ -228,7 +246,7 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
                                       dropout1_out_ptr,
                                       linear2_weight_ptr,
                                       d_dropout2_out_ptr);
-
+  // VLOG(0) << "matmul";
   std::tie(info_d_dropout1, info_dw2, a_1, b_1, a_2, b_2) = fc_info;
 
   // if l3_total_size >= dim_feedforward * bsz_seq * sizeof(T), first transpos
@@ -244,12 +262,12 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
     info_dw2.trans_x = !info_dw2.trans_x;
     info_dw2.stride_x = info_dw2.k;
   }
-
+  // VLOG(0) << "matmul";
   phi::MatMulXPUFunction<XPUTypeT>(
       xpu_ctx, a_1, b_1, c_1, info_d_dropout1, 1.0f, true);
 
-  phi::MatMulXPUFunction<XPUTypeT>(
-      xpu_ctx, a_2, b_2, c_2, info_dw2, 1.0f, true);
+  // phi::MatMulXPUFunction<XPUTypeT>(
+  //     xpu_ctx, a_2, b_2, c_2, info_dw2, 1.0f, true);
 
   // dropout_grad1
   DropoutGrad(xpu_ctx,
@@ -282,12 +300,12 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
   }
 
   // linear1_grad
-  r = xpu::reduce_sum(xpu_ctx,
-                      d_act_out_ptr,
-                      d_linear1_bias_ptr,
-                      {bsz_seq, dim_feedforward},
-                      {0});
-  PADDLE_ENFORCE_XDNN_SUCCESS(r, "reduce_sum");
+  // r = xpu::reduce_sum(xpu_ctx,
+  //                     d_act_out_ptr,
+  //                     d_linear1_bias_ptr,
+  //                     {bsz_seq, dim_feedforward},
+  //                     {0});
+  // PADDLE_ENFORCE_XDNN_SUCCESS(r, "reduce_sum");
 
   phi::XpuFcInfo linear1_fc_info;
   linear1_fc_info.InitFcInfo(0,
@@ -306,7 +324,7 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
   b_2 = reinterpret_cast<const XPUTypeT*>(NULL);
 
   c_1 = (pre_layer_norm == true ? d_linear1_out_ptr : d_x_ptr);
-  c_2 = d_linear1_weight_ptr;
+  // c_2 = d_linear1_weight_ptr;
   phi::XpuFcInfo info_dx;
   phi::XpuFcInfo info_dw1;
 
@@ -324,6 +342,8 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
     info_dw1.stride_x = info_dw1.k;
   }
 
+  // VLOG(0) << "matmul";
+
   fc_info = phi::MatmulGradFcInfo(xpu_ctx,
                                   &RAII_GUARD,
                                   linear1_fc_info,
@@ -335,25 +355,25 @@ void FFNGrad(const phi::XPUContext& dev_ctx,
 
   std::tie(info_dx, info_dw1, a_1, b_1, a_2, b_2) = fc_info;
 
-  phi::MatMulXPUFunction<XPUTypeT>(xpu_ctx, a_1, b_1, c_1, info_dx, 1.0f, true);
+  // phi::MatMulXPUFunction<XPUTypeT>(xpu_ctx, a_1, b_1, c_1, info_dx, 1.0f, true);
 
-  phi::MatMulXPUFunction<XPUTypeT>(
-      xpu_ctx, a_2, b_2, c_2, info_dw1, 1.0f, true);
+  // phi::MatMulXPUFunction<XPUTypeT>(
+  //     xpu_ctx, a_2, b_2, c_2, info_dw1, 1.0f, true);
 
   if (pre_layer_norm) {
-    r = xpu::layer_norm_grad(xpu_ctx,
-                             x_ptr,
-                             c_1,
-                             c_1,
-                             bsz_seq,
-                             d_model,
-                             epsilon,
-                             ln_scale_ptr,
-                             ln_mean_ptr,
-                             ln_variance_ptr,
-                             d_ln_scale_ptr,
-                             d_ln_bias_ptr);
-    PADDLE_ENFORCE_XDNN_SUCCESS(r, "layer_norm_grad");
+    // r = xpu::layer_norm_grad(xpu_ctx,
+    //                          x_ptr,
+    //                          c_1,
+    //                          c_1,
+    //                          bsz_seq,
+    //                          d_model,
+    //                          epsilon,
+    //                          ln_scale_ptr,
+    //                          ln_mean_ptr,
+    //                          ln_variance_ptr,
+    //                          d_ln_scale_ptr,
+    //                          d_ln_bias_ptr);
+    // PADDLE_ENFORCE_XDNN_SUCCESS(r, "layer_norm_grad");
   }
 
   r = xpu::add(xpu_ctx, c_1, d_residual_ptr, d_x_ptr, d_model * bsz_seq);
@@ -407,6 +427,18 @@ void FusedFeedForwardGradKernel(
     DenseTensor* linear1_bias_grad,
     DenseTensor* linear2_weight_grad,
     DenseTensor* linear2_bias_grad) {
+
+
+  
+  is_null(x_grad);
+  is_null(ln1_scale_grad);
+  is_null(ln1_bias_grad);
+  is_null(ln2_scale_grad);
+  is_null(ln2_bias_grad);
+  is_null(linear1_weight_grad);
+  is_null(linear1_bias_grad);
+  is_null(linear2_weight_grad);
+  is_null(linear2_bias_grad);
   // inputs
   auto* d_out = &out_grad;
   auto* x_ptr = &x;
@@ -479,12 +511,12 @@ void FusedFeedForwardGradKernel(
                                      nullptr,
                                      dropout2_seed_val);
   dev_ctx.template Alloc<T>(d_x);
-  dev_ctx.template Alloc<float>(d_ln_scale);
-  dev_ctx.template Alloc<float>(d_ln_bias);
-  dev_ctx.template Alloc<T>(d_linear1_bias);
-  dev_ctx.template Alloc<T>(d_linear2_bias);
-  dev_ctx.template Alloc<T>(d_linear1_weight);
-  dev_ctx.template Alloc<T>(d_linear2_weight);
+  // dev_ctx.template Alloc<float>(d_ln_scale);
+  // dev_ctx.template Alloc<float>(d_ln_bias);
+  // dev_ctx.template Alloc<T>(d_linear1_bias);
+  // dev_ctx.template Alloc<T>(d_linear2_bias);
+  // dev_ctx.template Alloc<T>(d_linear1_weight);
+  // dev_ctx.template Alloc<T>(d_linear2_weight);
 
   auto x_dim = x_ptr->dims();
   auto mat_dim_x = phi::funcs::CreateMatrixDescriptor(
