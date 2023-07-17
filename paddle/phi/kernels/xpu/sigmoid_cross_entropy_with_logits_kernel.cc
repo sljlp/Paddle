@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if 0
+
 #include <memory>
 
 #include "paddle/phi/kernels/sigmoid_cross_entropy_with_logits_kernel.h"
@@ -87,3 +89,4 @@ PD_REGISTER_KERNEL(sigmoid_cross_entropy_with_logits,
                    ALL_LAYOUT,
                    phi::SigmoidCrossEntropyWithLogitsKernel,
                    float) {}
+#endif

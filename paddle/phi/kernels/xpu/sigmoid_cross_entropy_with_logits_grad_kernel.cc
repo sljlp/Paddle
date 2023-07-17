@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+#if 0
 #include <memory>
 
 #include "paddle/phi/kernels/sigmoid_cross_entropy_with_logits_grad_kernel.h"
@@ -91,3 +91,4 @@ PD_REGISTER_KERNEL(sigmoid_cross_entropy_with_logits_grad,
                    ALL_LAYOUT,
                    phi::SigmoidCrossEntropyWithLogitsGradKernel,
                    float) {}
+#endif

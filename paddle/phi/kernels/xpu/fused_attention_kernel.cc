@@ -402,6 +402,11 @@ void FusedAttentionKernel(const Context &dev_ctx,
   if (pre_layer_norm == false) {
     real_out_ptr = bias_dropout_residual_out_ptr;
   }
+  /*
+template<typename T, typename TR> DLL_EXPORT int rotary_embedding(Context* ctx, const T* q, const T* k,
+        const TR* rotary_pos_emb, T* q_emb, T* k_emb, int batch, int seq_len, int head_num, int head_dim);
+  */
+  r = xpu::rotary_embedding<float, float>(NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 0);
 
   r = xpu::add(xpu_ctx,
                linear_out_ptr,

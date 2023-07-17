@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#if 0
 #include <iostream>
 #include <string>
 
@@ -22,3 +23,10 @@ int main(int argc UNUSED, char** argv UNUSED) {
   std::cout << phi::KernelFactory::Instance() << std::endl;
   return 0;
 }
+#else
+int main(int argc, char** argv) {
+  // std::cout << phi::KernelFactory::Instance() << std::endl;
+  return 0;
+}
+
+#endif
